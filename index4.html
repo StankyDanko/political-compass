@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A satirical political compass quiz with a dark theme">
+    <title>The Political Compass v0.0.4</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #1a1a1a;
+            color: #f3f4f6;
+            padding: 1rem;
+        }
+        #app {
+            background-color: #2a2a2a;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1.25rem;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+            width: 100%;
+            margin-top: 0.75rem;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .radio-label {
+            display: block;
+            margin-bottom: 0.75rem;
+            font-size: 1.125rem;
+        }
+        input[type="radio"] {
+            transform: scale(1.5);
+            margin-right: 0.75rem;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @media (max-width: 640px) {
+            #app {
+                padding: 1rem;
+            }
+            .radio-label {
+                font-size: 1rem;
+            }
+            h1 {
+                font-size: 1.75rem;
+            }
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+    <div id="app">
+        <!-- Welcome Screen -->
+        <div id="welcome" class="text-center">
+            <h1 class="text-3xl font-bold mb-4">The Political Compass v0.0.4</h1>
+            <p class="mb-4 text-lg">Take a 10-question quiz to find your political vibe—now with more laughs!</p>
+            <button id="startBtn" class="btn btn-primary">Start</button>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quiz" class="hidden">
+            <h2 class="text-2xl font-semibold mb-4">Question <span id="qNum"></span>/10</h2>
+            <p id="qText" class="mb-4 text-lg"></p>
+            <div id="answerOptions" class="space-y-3"></div>
+            <button id="nextBtn" class="btn btn-primary mt-6">Next</button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden text-center">
+            <h2 class="text-2xl font-semibold mb-4">Your Result</h2>
+            <div class="bg-gray-700 p-4 rounded shadow mb-4">
+                <h3 id="quadrant" class="text-3xl font-bold"></h3>
+            </div>
+            <p id="description" class="mb-4 text-lg"></p>
+            <canvas id="compassCanvas" width="300" height="300" style="width: 100%; max-width: 300px; height: auto;" class="mx-auto"></canvas>
+            <div class="mt-4">
+                <p>Share your result:</p>
+                <input type="text" id="shareLink" class="w-full p-2 mb-2 bg-gray-700 text-white" readonly>
+                <button onclick="copyToClipboard()" class="btn btn-secondary">Copy Link</button>
+            </div>
+            <button id="restartBtn" class="btn btn-secondary mt-4">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            { text: "The government should provide free education for all citizens, even if it means teaching flat-earth theory to keep things fair.", axis: "left-right", direction: "left" },
+            { text: "Businesses should operate with minimal regulation—because who doesn’t trust CEOs to self-regulate their private jets?", axis: "left-right", direction: "right" },
+            { text: "Income inequality is a pressing issue, unlike the existential dread of choosing between oat milk and almond milk.", axis: "left-right", direction: "left" },
+            { text: "Lower taxes are the key to economic growth, and trickle-down economics totally isn’t a fairy tale.", axis: "left-right", direction: "right" },
+            { text: "Workers should control the means of production—because managers definitely love group hugs.", axis: "left-right", direction: "left" },
+            { text: "Strict laws are needed to maintain order, or else we’d all be dancing naked in the streets by noon.", axis: "auth-lib", direction: "auth" },
+            { text: "People should be free to make dumb choices—like naming their kid ‘Tax Exemption.’", axis: "auth-lib", direction: "lib" },
+            { text: "National security trumps privacy, because who needs secrets when you’ve got nothing to hide?", axis: "auth-lib", direction: "auth" },
+            { text: "Free speech includes the right to offend, even if it means yelling ‘pineapple on pizza’ in a crowd.", axis: "auth-lib", direction: "lib" },
+            { text: "The government should promote traditional values—like mandatory mullet haircuts and VHS tapes.", axis: "auth-lib", direction: "auth" }
+        ];
+
+        const descriptions = {
+            "AuthRight": "You’re all about virtue and tradition—think church on Sundays and laws for everything. Pros: Society runs like clockwork. Cons: You’re the clockmaker. Weakness: Anyone asking ‘Why?’",
+            "AuthLeft": "Equality is your jam, even if it means everyone gets an equal slice of nothing. Pros: Solidarity vibes. Cons: The breadline’s a mile long. Weakness: Hearing ‘capitalism isn’t that bad.’",
+            "LibLeft": "Compassion drives you—free love, free weed, free everything. Pros: Everyone’s happy (sort of). Cons: Your commune’s broke. Weakness: Seeing a ‘No U-turn’ sign.",
+            "LibRight": "Freedom’s your god—markets rule, rules drool. Pros: You’re rich (in theory). Cons: No safety net when the crypto crashes. Weakness: The phrase ‘public good.’",
+            "Centrist": "You’re the king of ‘meh’—beef prices and gas stations are your battleground. Pros: You avoid fights. Cons: You’re boring at parties. Weakness: Picking a side."
+        };
+
+        const selections = [
+            { label: "Strongly Agree", points: 2 },
+            { label: " Agree", points: 1 },
+            { label: "Neutral", points: 0 },
+            { label: "Disagree", points: -1 },
+            { label: "Strongly Disagree", points: -2 }
+        ];
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        let currentQuestion = 0;
+        let score = { "left-right": 0, "auth-lib": 0 };
+
+        const welcome = document.getElementById('welcome');
+        const quiz = document.getElementById('quiz');
+        const results = document.getElementById('results');
+        const startBtn = document.getElementById('startBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        startBtn.addEventListener('click', () => {
+            welcome.classList.add('hidden');
+            quiz.classList.remove('hidden');
+            shuffle(selections);
+            const answerOptions = document.getElementById('answerOptions');
+            answerOptions.innerHTML = '';
+            selections.forEach((sel) => {
+                const label = document.createElement('label');
+                label.className = 'radio-label';
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'answer';
+                input.value = sel.points;
+                label.appendChild(input);
+                label.appendChild(document.createTextNode(sel.label));
+                answerOptions.appendChild(label);
+            });
+            loadQuestion();
+        });
+
+        nextBtn.addEventListener('click', () => {
+            const selected = document.querySelector('input[name="answer"]:checked');
+            if (!selected) return alert('Please select an answer!');
+            const points = parseInt(selected.value);
+            const q = questions[currentQuestion];
+            const multiplier = (q.axis === "left-right" ? (q.direction === "left" ? 1 : -1) : (q.direction === "auth" ? 1 : -1));
+            score[q.axis] += multiplier * points;
+            currentQuestion++;
+            if (currentQuestion < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+            document.querySelectorAll('input[name="answer"]').forEach(input => input.checked = false);
+        });
+
+        restartBtn.addEventListener('click', () => {
+            currentQuestion = 0;
+            score = { "left-right": 0, "auth-lib": 0 };
+            results.classList.add('hidden');
+            quiz.classList.remove('hidden');
+            loadQuestion();
+        });
+
+        function loadQuestion() {
+            const q = questions[currentQuestion];
+            document.getElementById('qNum').textContent = currentQuestion + 1;
+            document.getElementById('qText').textContent = q.text;
+            quiz.classList.add('fade-in');
+            setTimeout(() => quiz.classList.remove('fade-in'), 500);
+        }
+
+        function showResults() {
+            quiz.classList.add('hidden');
+            results.classList.remove('hidden');
+            const lr = score["left-right"];
+            const al = score["auth-lib"];
+            let quadrant;
+            if (Math.abs(lr) < 2 && Math.abs(al) < 2) {
+                quadrant = "Centrist";
+            } else if (lr > 0 && al > 0) {
+                quadrant = "AuthLeft";
+            } else if (lr > 0 && al < 0) {
+                quadrant = "LibLeft";
+            } else if (lr < 0 && al > 0) {
+                quadrant = "AuthRight";
+            } else {
+                quadrant = "LibRight";
+            }
+            document.getElementById('quadrant').textContent = quadrant;
+            document.getElementById('description').textContent = descriptions[quadrant];
+
+            // Draw on canvas
+            const canvas = document.getElementById('compassCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(150, 0);
+            ctx.lineTo(150, 300);
+            ctx.moveTo(0, 150);
+            ctx.lineTo(300, 150);
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px sans-serif';
+            ctx.fillText('Left', 10, 140);
+            ctx.fillText('Right', 260, 140);
+            ctx.fillText('Authoritarian', 130, 20);
+            ctx.fillText('Libertarian', 130, 290);
+            const x = 150 + (lr * 15);
+            const y = 150 - (al * 15);
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.fillText('You', x + 10, y - 10);
+
+            const shareLink = `${window.location.origin}${window.location.pathname}?lr=${lr}&al=${al}`;
+            document.getElementById('shareLink').value = shareLink;
+        }
+
+        function copyToClipboard() {
+            const link = document.getElementById('shareLink');
+            link.select();
+            document.execCommand('copy');
+            alert('Link copied to clipboard!');
+        }
+    </script>
+</body>
+</html>
