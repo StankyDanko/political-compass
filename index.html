@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A humorous political compass quiz">
+    <title>The Political Compass</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div id="app" class="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full">
+        <!-- Welcome Screen -->
+        <div id="welcome" class="text-center">
+            <h1 class="text-3xl font-bold mb-4">The Political Compass</h1>
+            <p class="mb-4">Answer 10 questions to find your spot on the compass—humor included!</p>
+            <button id="startBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Start</button>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quiz" class="hidden">
+            <h2 class="text-2xl font-semibold mb-4">Question <span id="qNum"></span>/10</h2>
+            <p id="qText" class="mb-4"></p>
+            <div class="space-y-2">
+                <label><input type="radio" name="answer" value="1"> Strongly Agree</label><br>
+                <label><input type="radio" name="answer" value="2"> Agree</label><br>
+                <label><input type="radio" name="answer" value="3"> Neutral</label><br>
+                <label><input type="radio" name="answer" value="4"> Disagree</label><br>
+                <label><input type="radio" name="answer" value="5"> Strongly Disagree</label>
+            </div>
+            <button id="nextBtn" class="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Next</button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden text-center">
+            <h2 class="text-2xl font-semibold mb-4">Your Result</h2>
+            <p class="text-xl font-bold mb-2" id="quadrant"></p>
+            <p id="description" class="mb-4"></p>
+            <button id="restartBtn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            { text: "The government should provide free education for all citizens.", axis: "left-right", direction: "left" },
+            { text: "Businesses should operate with minimal regulation.", axis: "left-right", direction: "right" },
+            { text: "Income inequality needs urgent fixing.", axis: "left-right", direction: "left" },
+            { text: "Lower taxes drive economic growth.", axis: "left-right", direction: "right" },
+            { text: "Workers should control production.", axis: "left-right", direction: "left" },
+            { text: "Strict laws are needed for public order.", axis: "auth-lib", direction: "auth" },
+            { text: "People should make their own choices, even dumb ones.", axis: "auth-lib", direction: "lib" },
+            { text: "National security trumps privacy.", axis: "auth-lib", direction: "auth" },
+            { text: "Free speech includes offensive opinions.", axis: "auth-lib", direction: "lib" },
+            { text: "Government should promote traditional values.", axis: "auth-lib", direction: "auth" }
+        ];
+
+        const descriptions = {
+            "AuthRight": "You love virtue and tradition. Pros: Everyone pursues ideals. Cons: You define them.",
+            "AuthLeft": "Equality is your vibe. Pros: Shared wealth. Cons: There’s no wealth.",
+            "LibLeft": "Compassion rules. Pros: Community love. Cons: Your wife’s boyfriend says hi.",
+            "LibRight": "Freedom reigns. Pros: Markets soar. Cons: The poor just… die.",
+            "Centrist": "Beef and gas prices matter most. Pros: Pragmatic. Cons: World’s a mess."
+        };
+
+        let currentQuestion = 0;
+        let score = { "left-right": 0, "auth-lib": 0 };
+
+        const welcome = document.getElementById('welcome');
+        const quiz = document.getElementById('quiz');
+        const results = document.getElementById('results');
+        const startBtn = document.getElementById('startBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        startBtn.addEventListener('click', () => {
+            welcome.classList.add('hidden');
+            quiz.classList.remove('hidden');
+            loadQuestion();
+        });
+
+        nextBtn.addEventListener('click', () => {
+            const selected = document.querySelector('input[name="answer"]:checked');
+            if (!selected) return alert('Please select an answer!');
+            const answer = parseInt(selected.value);
+            const points = 3 - answer; // 2,1,0,-1,-2
+            const q = questions[currentQuestion];
+            const multiplier = (q.axis === "left-right" ? (q.direction === "left" ? 1 : -1) : (q.direction === "auth" ? 1 : -1));
+            score[q.axis] += multiplier * points;
+
+            currentQuestion++;
+            if (currentQuestion < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+            document.querySelectorAll('input[name="answer"]').forEach(input => input.checked = false);
+        });
+
+        restartBtn.addEventListener('click', () => {
+            currentQuestion = 0;
+            score = { "left-right": 0, "auth-lib": 0 };
+            results.classList.add('hidden');
+            quiz.classList.remove('hidden');
+            loadQuestion();
+        });
+
+        function loadQuestion() {
+            const q = questions[currentQuestion];
+            document.getElementById('qNum').textContent = currentQuestion + 1;
+            document.getElementById('qText').textContent = q.text;
+            quiz.classList.add('fade-in');
+            setTimeout(() => quiz.classList.remove('fade-in'), 500);
+        }
+
+        function showResults() {
+            quiz.classList.add('hidden');
+            results.classList.remove('hidden');
+            const lr = score["left-right"];
+            const al = score["auth-lib"];
+            let quadrant;
+            if (Math.abs(lr) < 2 && Math.abs(al) < 2) {
+                quadrant = "Centrist";
+            } else if (lr > 0 && al > 0) {
+                quadrant = "AuthLeft";
+            } else if (lr > 0 && al < 0) {
+                quadrant = "LibLeft";
+            } else if (lr < 0 && al > 0) {
+                quadrant = "AuthRight";
+            } else {
+                quadrant = "LibRight";
+            }
+            document.getElementById('quadrant').textContent = quadrant;
+            document.getElementById('description').textContent = descriptions[quadrant];
+        }
+    </script>
+</body>
+</html>
