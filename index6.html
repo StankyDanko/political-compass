@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fun quiz to discover your unique vibe">
+    <title>The Compass Quiz v0.0.6</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #1a1a1a;
+            color: #f3f4f6;
+            padding: 1rem;
+        }
+        #app {
+            background-color: #2a2a2a;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1.25rem;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+            width: 100%;
+            margin-top: 0.75rem;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .radio-label {
+            display: block;
+            margin-bottom: 0.75rem;
+            font-size: 1.125rem;
+        }
+        input[type="radio"] {
+            transform: scale(1.5);
+            margin-right: 0.75rem;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @media (max-width: 640px) {
+            #app {
+                padding: 1rem;
+            }
+            .radio-label {
+                font-size: 1rem;
+            }
+            h1 {
+                font-size: 1.75rem;
+            }
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+    <div id="app">
+        <!-- Welcome Screen -->
+        <div id="welcome" class="text-center">
+            <h1 class="text-3xl font-bold mb-4">The Compass Quiz v0.0.6</h1>
+            <p class="mb-4 text-lg">Take a 10-question quiz to see where you land!</p>
+            <button id="startBtn" class="btn btn-primary">Start</button>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quiz" class="hidden">
+            <h2 class="text-2xl font-semibold mb-4">Question <span id="qNum"></span>/10</h2>
+            <p id="qText" class="mb-4 text-lg"></p>
+            <div class="space-y-3">
+                <label class="radio-label"><input type="radio" name="answer" value="1"> Strongly Agree</label>
+                <label class="radio-label"><input type="radio" name="answer" value="2"> Agree</label>
+                <label class="radio-label"><input type="radio" name="answer" value="3"> Neutral</label>
+                <label class="radio-label"><input type="radio" name="answer" value="4"> Disagree</label>
+                <label class="radio-label"><input type="radio" name="answer" value="5"> Strongly Disagree</label>
+            </div>
+            <button id="nextBtn" class="btn btn-primary mt-6">Next</button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden text-center">
+            <h2 class="text-2xl font-semibold mb-4">Your Result</h2>
+            <p class="text-xl font-bold mb-2" id="quadrant"></p>
+            <p id="description" class="mb-4 text-lg"></p>
+            <canvas id="compassCanvas" width="300" height="300" class="mx-auto max-w-full"></canvas>
+            <div class="mt-4">
+                <p>Share your result:</p>
+                <input type="text" id="shareLink" class="w-full p-2 mb-2 bg-gray-700 text-white" readonly>
+                <button onclick="copyToClipboard()" class="btn btn-secondary">Copy Link</button>
+            </div>
+            <button id="restartBtn" class="btn btn-secondary mt-4">Try Again</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            // Left-Right Questions
+            { text: "When playing a team sport, the prize should be split equally among all players, even if some scored more points.", axis: "left-right", direction: "left" },
+            { text: "In a shared house, everyone should pitch in the same amount for groceries, no matter how much they eat.", axis: "left-right", direction: "left" },
+            { text: "At a garage sale, sellers should be able to set any price they want, even if it’s outrageously high.", axis: "left-right", direction: "right" },
+            { text: "If you lend your bike to a friend, it’s fair to ask for a small rental fee.", axis: "left-right", direction: "right" },
+            { text: "In a group gift, it’s better if everyone contributes the same amount, regardless of their budget.", axis: "left-right", direction: "left" },
+            // Authoritarian-Libertarian Questions
+            { text: "When hosting a movie night, it’s best to stick to a strict start time rather than let people show up whenever.", axis: "auth-lib", direction: "auth" },
+            { text: "It’s fine to sneak an extra snack from a friend’s stash if they won’t notice.", axis: "auth-lib", direction: "lib" },
+            { text: "During a road trip, the driver should decide the music because they’re in charge.", axis: "auth-lib", direction: "auth" },
+            { text: "If a neighbor’s tree hangs over your yard, you should be free to trim it without asking.", axis: "auth-lib", direction: "lib" },
+            { text: "Kids at a sleepover need a set bedtime to keep things under control.", axis: "auth-lib", direction: "auth" }
+        ];
+
+        const descriptions = {
+            "AuthRight": "You like order and rewarding effort—think a strict coach who pays the star player extra. Pros: Things get done. Cons: You’re annoyed by slackers. Weakness: Group hugs.",
+            "AuthLeft": "Fairness is your thing, even if it means everyone waits in line together. Pros: No one’s left out. Cons: Lines are long. Weakness: Someone cutting ahead.",
+            "LibLeft": "You’re chill and sharing—picture a potluck with no rules. Pros: Fun vibes. Cons: Chaos reigns. Weakness: Someone hogging the snacks.",
+            "LibRight": "Freedom and hustle define you—like a lemonade stand with no permits. Pros: You thrive. Cons: No help if it flops. Weakness: Rainy days.",
+            "Centrist": "You’re the referee who doesn’t care who wins. Pros: No drama. Cons: No excitement. Weakness: Deciding dinner."
+        };
+
+        let currentQuestion = 0;
+        let score = { "left-right": 0, "auth-lib": 0 };
+
+        const welcome = document.getElementById('welcome');
+        const quiz = document.getElementById('quiz');
+        const results = document.getElementById('results');
+        const startBtn = document.getElementById('startBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Check for shared result
+        const urlParams = new URLSearchParams(window.location.search);
+        const lrParam = urlParams.get('lr');
+        const alParam = urlParams.get('al');
+        if (lrParam && alParam) {
+            score["left-right"] = parseInt(lrParam);
+            score["auth-lib"] = parseInt(alParam);
+            showResults();
+            welcome.classList.add('hidden');
+            quiz.classList.add('hidden');
+            results.classList.remove('hidden');
+            const sharedMessage = document.createElement('p');
+            sharedMessage.textContent = 'This is a shared result.';
+            sharedMessage.className = 'text-yellow-400 mb-4';
+            results.insertBefore(sharedMessage, results.firstChild);
+        }
+
+        startBtn.addEventListener('click', () => {
+            welcome.classList.add('hidden');
+            quiz.classList.remove('hidden');
+            loadQuestion();
+        });
+
+        nextBtn.addEventListener('click', () => {
+            const selected = document.querySelector('input[name="answer"]:checked');
+            if (!selected) return alert('Please select an answer!');
+            const answer = parseInt(selected.value);
+            const points = 3 - answer; // 2,1,0,-1,-2
+            const q = questions[currentQuestion];
+            const multiplier = (q.axis === "left-right" ? (q.direction === "left" ? 1 : -1) : (q.direction === "auth" ? 1 : -1));
+            score[q.axis] += multiplier * points;
+
+            currentQuestion++;
+            if (currentQuestion < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+            document.querySelectorAll('input[name="answer"]').forEach(input => input.checked = false);
+        });
+
+        restartBtn.addEventListener('click', () => {
+            currentQuestion = 0;
+            score = { "left-right": 0, "auth-lib": 0 };
+            results.classList.add('hidden');
+            quiz.classList.remove('hidden');
+            loadQuestion();
+        });
+
+        function loadQuestion() {
+            const q = questions[currentQuestion];
+            document.getElementById('qNum').textContent = currentQuestion + 1;
+            document.getElementById('qText').textContent = q.text;
+            quiz.classList.add('fade-in');
+            setTimeout(() => quiz.classList.remove('fade-in'), 500);
+        }
+
+        function showResults() {
+            quiz.classList.add('hidden');
+            results.classList.remove('hidden');
+            const lr = score["left-right"];
+            const al = score["auth-lib"];
+            let quadrant;
+            if (Math.abs(lr) < 2 && Math.abs(al) < 2) {
+                quadrant = "Centrist";
+            } else if (lr > 0 && al > 0) {
+                quadrant = "AuthLeft";
+            } else if (lr > 0 && al < 0) {
+                quadrant = "LibLeft";
+            } else if (lr < 0 && al > 0) {
+                quadrant = "AuthRight";
+            } else {
+                quadrant = "LibRight";
+            }
+            document.getElementById('quadrant').textContent = quadrant;
+            document.getElementById('description').textContent = descriptions[quadrant];
+
+            // Draw on canvas with scaling factor 15
+            const canvas = document.getElementById('compassCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw axes
+            ctx.beginPath();
+            ctx.moveTo(150, 0);
+            ctx.lineTo(150, 300);
+            ctx.moveTo(0, 150);
+            ctx.lineTo(300, 150);
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            // Draw labels
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px sans-serif';
+            ctx.fillText('Left', 10, 140);
+            ctx.fillText('Right', 260, 140);
+            ctx.fillText('Authoritarian', 130, 20);
+            ctx.fillText('Libertarian', 130, 290);
+            // Plot user's point
+            const scalingFactor = 15; // For scores -10 to 10
+            const x = 150 - (lr * scalingFactor);
+            const y = 150 - (al * scalingFactor);
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.fillText('You', x + 10, y - 10);
+
+            // Set share link
+            const shareLink = `${window.location.origin}${window.location.pathname}?lr=${lr}&al=${al}`;
+            document.getElementById('shareLink').value = shareLink;
+        }
+
+        function copyToClipboard() {
+            const link = document.getElementById('shareLink');
+            link.select();
+            document.execCommand('copy');
+            alert('Link copied to clipboard!');
+        }
+    </script>
+</body>
+</html>
